@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>QRスキャン / QR Scan</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #000; color: #fff;
+    font-family: -apple-system, "Hiragino Sans", sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .frame { position: relative; width: 100%; max-width: 480px; }
+  video { width: 100%; border-radius: 16px; display: block; background: #111; }
+  canvas { display: none; }
+  .msg { margin-top: 18px; font-size: 17px; text-align: center; padding: 0 24px; line-height: 1.6; }
+  .cancel {
+    margin-top: 26px; padding: 14px 32px; border-radius: 999px; border: none;
+    background: #333; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+  <div class="frame">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div class="msg" id="msg">カメラを起動しています…</div>
+  <button class="cancel" onclick="cancelScan()">キャンセルして戻る</button>
+
+  <!-- QRコードを解析するための無料ライブラリ（jsQR） -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script>
+    // URLの ?return=...&dept=...&label=... を受け取る
+    const params = new URLSearchParams(location.search);
+    const returnUrl = params.get('return');
+    const dept = params.get('dept') || '';
+    const label = params.get('label') || '';
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const msg = document.getElementById('msg');
+
+    let scanning = true;
+    let currentStream = null;
+
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(function (t) { t.stop(); });
+        currentStream = null;
+      }
+    }
+
+    function cancelScan() {
+      stopCamera();
+      if (returnUrl) {
+        location.href = returnUrl;
+      }
+    }
+
+    // facingMode: 'user' = インカメラ（前面カメラ）
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      .then(function (stream) {
+        currentStream = stream;
+        video.srcObject = stream;
+        msg.textContent = 'QRコードをカメラにかざしてください\n(Please hold your QR code up to the camera)';
+        requestAnimationFrame(tick);
+      })
+      .catch(function (err) {
+        msg.textContent = 'カメラを起動できませんでした。iPadの「設定」→ このブラウザのカメラ許可をご確認ください。\n(' + err.message + ')';
+      });
+
+    function tick() {
+      if (!scanning) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code && code.data) {
+          scanning = false;
+          onScanned(code.data);
+          return;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function onScanned(value) {
+      msg.textContent = '読み取りました: ' + value + '\n受付画面に戻ります…';
+      stopCamera();
+      if (!returnUrl) return;
+      const url = returnUrl
+        + '?scanned=' + encodeURIComponent(value)
+        + '&dept=' + encodeURIComponent(dept)
+        + '&label=' + encodeURIComponent(label);
+      setTimeout(function () { location.href = url; }, 500);
+    }
+  </script>
+
+</body>
+</html>
