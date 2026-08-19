@@ -15,7 +15,14 @@
   .frame { position: relative; width: 100%; max-width: 480px; }
   video { width: 100%; border-radius: 16px; display: block; background: #111; }
   canvas { display: none; }
+  .guide {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 62%; aspect-ratio: 1 / 1; border: 3px solid rgba(255,255,255,0.85);
+    border-radius: 16px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.35);
+    pointer-events: none;
+  }
   .msg { margin-top: 18px; font-size: 17px; text-align: center; padding: 0 24px; line-height: 1.6; }
+  .hint { margin-top: 6px; font-size: 13px; color: #aaa; text-align: center; padding: 0 24px; line-height: 1.5; }
   .cancel {
     margin-top: 26px; padding: 14px 32px; border-radius: 999px; border: none;
     background: #333; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
@@ -26,9 +33,11 @@
 
   <div class="frame">
     <video id="video" autoplay playsinline muted></video>
+    <div class="guide"></div>
   </div>
-  <canvas id="canvas"></canvas>
   <div class="msg" id="msg">カメラを起動しています…</div>
+  <div class="hint">QRコードを枠の中に、15〜20cmほど離してかざしてください<br>(Hold the QR code inside the frame, about 15-20cm away)</div>
+  <canvas id="canvas"></canvas>
   <button class="cancel" onclick="cancelScan()">キャンセルして戻る</button>
 
   <!-- QRコードを解析するための無料ライブラリ（jsQR） -->
@@ -62,8 +71,17 @@
       }
     }
 
-    // facingMode: 'user' = インカメラ（前面カメラ）
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    // facingMode: 'user' = インカメラ（前面カメラ）。
+    // 解像度をできるだけ高く要求し、可能ならピント調整も有効にすることで、
+    // 近距離のQRコードでも読み取りやすくする。
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        advanced: [{ focusMode: 'continuous' }]
+      }
+    })
       .then(function (stream) {
         currentStream = stream;
         video.srcObject = stream;
@@ -77,11 +95,21 @@
     function tick() {
       if (!scanning) return;
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        // 画面中央の「枠」に対応する領域だけを切り出して解析する。
+        // 全体を解析するより、対象がはっきりした部分だけを見る方が
+        // 認識の精度・速度が上がりやすい。
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const guideRatio = 0.62; // .guide の width と揃える
+        const size = Math.round(Math.min(vw, vh) * guideRatio);
+        const sx = Math.round((vw - size) / 2);
+        const sy = Math.round((vh - size) / 2);
+
+        canvas.width = size;
+        canvas.height = size;
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+        const imageData = ctx.getImageData(0, 0, size, size);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
         if (code && code.data) {
           scanning = false;
           onScanned(code.data);
