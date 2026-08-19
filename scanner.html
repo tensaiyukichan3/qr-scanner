@@ -12,12 +12,12 @@
     font-family: -apple-system, "Hiragino Sans", sans-serif;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .frame { position: relative; width: 100%; max-width: 480px; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 16px; background: #111; }
+  .frame { position: relative; width: 94%; max-width: 720px; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 16px; background: #111; }
   video { width: 100%; height: 100%; object-fit: cover; display: block; }
   canvas { display: none; }
   .guide {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 62%; aspect-ratio: 1 / 1; border: 3px solid rgba(255,255,255,0.85);
+    width: 82%; aspect-ratio: 1 / 1; border: 3px solid rgba(255,255,255,0.85);
     border-radius: 16px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.35);
     pointer-events: none;
   }
@@ -100,7 +100,7 @@
         // 認識の精度・速度が上がりやすい。
         const vw = video.videoWidth;
         const vh = video.videoHeight;
-        const guideRatio = 0.62; // .guide の width と揃える
+        const guideRatio = 0.82; // .guide の width と揃える
         const size = Math.round(Math.min(vw, vh) * guideRatio);
         const sx = Math.round((vw - size) / 2);
         const sy = Math.round((vh - size) / 2);
